@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mood & Journal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f172a;          /* slate-900 */
+      --panel:#111827;       /* gray-900 */
+      --muted:#94a3b8;       /* slate-400 */
+      --text:#e5e7eb;        /* gray-200 */
+      --brand:#8b5cf6;       /* violet-500 */
+      --accent:#22d3ee;      /* cyan-400 */
+      --ok:#10b981;          /* emerald-500 */
+      --warn:#f59e0b;        /* amber-500 */
+      --bad:#ef4444;         /* red-500 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--text); background:radial-gradient(1200px 600px at 80% -10%, rgba(139,92,246,.25), transparent 50%),
+      radial-gradient(800px 400px at -10% 10%, rgba(34,211,238,.18), transparent 50%), var(--bg);
+    }
+    .container{max-width:1100px; margin:32px auto; padding:0 16px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:22px}
+    h1{font-size:28px; margin:0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:14px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px}
+    .grid{display:grid; grid-template-columns: 1.1fr 1fr; gap:16px}
+    @media (max-width: 900px){.grid{grid-template-columns:1fr}}
+    .moods{display:flex; gap:10px; flex-wrap:wrap}
+    .moodbtn{flex:1 0 110px; min-width:110px; background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px; cursor:pointer; transition:transform .05s ease, border-color .15s ease; text-align:left}
+    .moodbtn:hover{transform:translateY(-1px); border-color:rgba(139,92,246,.6)}
+    .moodbtn.active{outline:2px solid var(--brand)}
+    .mood-emoji{font-size:28px; line-height:1}
+    .mood-title{font-weight:700; margin-top:8px}
+    .mood-sub{font-size:12px; color:var(--muted)}
+
+    textarea{width:100%; resize:vertical; min-height:120px; background:var(--panel); color:var(--text); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px; font:inherit}
+    .actions{display:flex; gap:10px; flex-wrap:wrap}
+    .btn{appearance:none; border:1px solid rgba(255,255,255,.1); background:linear-gradient(180deg, rgba(139,92,246,.22), rgba(139,92,246,.1)); color:white; padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer}
+    .btn.secondary{background:transparent}
+    .btn.ghost{background:transparent; border-color:rgba(255,255,255,.06); color:var(--muted)}
+
+    .list{display:grid; gap:10px; margin-top:10px}
+    .entry{border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); border-radius:14px; padding:12px}
+    .entry-top{display:flex; justify-content:space-between; gap:10px; align-items:center}
+    .pill{font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.1)}
+    .muted{color:var(--muted)}
+    .quote{font-style:italic; color:#dbeafe}
+    .tools{display:flex; gap:8px; flex-wrap:wrap}
+    .tools .btn{padding:8px 10px; font-weight:600}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .search{flex:1; background:var(--panel); border:1px solid rgba(255,255,255,.08); color:var(--text); border-radius:10px; padding:10px}
+    canvas{width:100% !important; height:300px !important}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🧠 Mood & Journal Tracker</h1>
+        <div class="sub">Track your mood daily, jot thoughts, and get an auto motivational quote.</div>
+      </div>
+      <div class="tools">
+        <button class="btn ghost" id="exportBtn" title="Download your data as JSON">Export</button>
+        <label class="btn ghost" for="importFile" title="Load data from JSON">Import</label>
+        <input id="importFile" type="file" accept="application/json" hidden>
+        <button class="btn secondary" id="clearBtn" title="Delete all data">Clear</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left column: input + list -->
+      <section class="panel">
+        <h2 style="margin:6px 0 12px">Today</h2>
+        <div class="moods" id="moodPicker"></div>
+        <div style="margin:12px 0 6px; font-weight:600">Journal</div>
+        <textarea id="journal" placeholder="How are you feeling? What happened today?"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn" id="saveBtn">Save entry</button>
+          <button class="btn secondary" id="quoteBtn">Generate quote</button>
+          <span id="quoteText" class="quote"></span>
+        </div>
+      </section>
+
+      <!-- Right column: chart -->
+      <section class="panel">
+        <div class="row">
+          <h2 style="margin:6px 0 12px">Mood Trend</h2>
+          <input id="search" class="search" placeholder="Search journal (e.g., exam, family, project)" />
+        </div>
+        <canvas id="moodChart"></canvas>
+        <div class="sub" style="margin-top:8px">Tip: click a point to see the entry of that day.</div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:16px">
+      <h2 style="margin:6px 0 12px">Your Entries</h2>
+      <div id="entries" class="list"></div>
+    </section>
+  </div>
+
+  <script>
+    // --- Storage helpers ---
+    const KEY = 'ms1_mood_journal_v1';
+    const load = () => JSON.parse(localStorage.getItem(KEY) || '[]');
+    const save = (data) => localStorage.setItem(KEY, JSON.stringify(data));
+
+    // --- Mood configuration ---
+    const MOODS = [
+      {score:1, name:'Very Low', emoji:'😞', color:'var(--bad)'},
+      {score:2, name:'Low', emoji:'😕', color:'var(--warn)'},
+      {score:3, name:'Neutral', emoji:'😐', color:'var(--muted)'},
+      {score:4, name:'Good', emoji:'🙂', color:'var(--ok)'},
+      {score:5, name:'Happy', emoji:'😄', color:'var(--accent)'}
+    ];
+
+    // Quotes bank
+    const QUOTES = {
+      1:[
+        'Every storm runs out of rain.',
+        'One step at a time is still progress.',
+        'You’ve survived 100% of your bad days.',
+        'You are stronger than you think.',
+        'It’s okay to not be okay',
+        'One day, everything will make sense—keep going',
+        'You’ve survived tough days before; you can do it again.'
+      ],
+      2:[
+        'Slow growth is still growth.',
+        'Be gentle with yourself today.',
+        'Small wins count—stack them.',
+        'Progress, not perfection, matters.',
+        'Every step forward counts, no matter how small',
+        'Even in your broken moments, you can do amazing things',
+        'Even in your darkest moments, light can be found.'
+      ],
+      3:[
+        'Every day is a new beginning.',
+        'Take time to notice the little things around you.',
+        'Little by little, a little becomes a lot.',
+        'Every day is a new opportunity to grow',
+        'Your journey is unique; trust the process.',
+        'Keep moving forward, even if slowly.',
+        'Even small effort can lead to meaningful change.'
+      ],
+      4:[
+        'Ride the wave and share the good.',
+        'Energy flows where attention goes.',
+        'Keep going.',
+        'Celebrate the small victories—they matter',
+        'Good days are the building blocks of great lives.',
+        'Radiate positivity, and life will respond in kind.',
+        'Good vibes create great lives.'
+
+      ],
+      5:[
+        'Happiness is a journey, not a destination',
+        'Shine, but stay grounded.',
+        'Every happy moment is a gift—cherish it.',
+        'Keep doing what makes your soul happy.',
+        'Happiness is not by chance, it’s by choice',
+        'Smile more; worry less.',
+        'Spread love and good energy wherever you go',
+        'Happiness blooms from within.'
+      ]
+    };
+
+    // --- UI Elements ---
+    const moodPicker = document.getElementById('moodPicker');
+    const journalEl = document.getElementById('journal');
+    const quoteText = document.getElementById('quoteText');
+    const entriesEl = document.getElementById('entries');
+    const searchEl = document.getElementById('search');
+
+    let selectedMood = null;
+    let chart, data = load();
+
+    // Build mood buttons
+    function renderMoodButtons(){
+      moodPicker.innerHTML = '';
+      MOODS.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'moodbtn';
+        btn.innerHTML = `
+          <div class="mood-emoji">${m.emoji}</div>
+          <div class="mood-title">${m.name}</div>
+          <div class="mood-sub">Score ${m.score}</div>`;
+        btn.onclick = () => {
+          selectedMood = m.score;
+          document.querySelectorAll('.moodbtn').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+        };
+        moodPicker.appendChild(btn);
+      });
+    }
+
+    // Save entry
+    document.getElementById('saveBtn').onclick = () => {
+      if(!selectedMood){ alert('Pick your mood first 🙂'); return; }
+      const text = journalEl.value.trim();
+      const today = new Date();
+      const iso = today.toISOString().slice(0,10); // yyyy-mm-dd
+
+      // If an entry exists for today, replace it (1 per day)
+      data = load();
+      const idx = data.findIndex(e => e.date === iso);
+      const item = {date: iso, ts: Date.now(), mood: selectedMood, text};
+      if(idx>=0) data[idx] = item; else data.push(item);
+      data.sort((a,b) => a.date.localeCompare(b.date));
+      save(data);
+      journalEl.value = '';
+      selectedMood = null; document.querySelectorAll('.moodbtn').forEach(b=>b.classList.remove('active'));
+      quoteText.textContent='';
+      renderAll();
+    };
+
+    // Quote generator
+    document.getElementById('quoteBtn').onclick = () => {
+      const bucket = selectedMood || 3; // neutral fallback
+      const list = QUOTES[bucket];
+      const q = list[Math.floor(Math.random()*list.length)];
+      quoteText.textContent = '“' + q + '”';
+    };
+
+    // Export/Import/Clear
+    document.getElementById('exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify(load(), null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'mood_journal_backup.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    document.getElementById('importFile').onchange = (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { try { save(JSON.parse(reader.result)); data = load(); renderAll(); } catch(err){ alert('Invalid JSON'); } };
+      reader.readAsText(file);
+      e.target.value = '';
+    };
+    document.getElementById('clearBtn').onclick = () => {
+      if(confirm('Delete ALL mood & journal data on this device?')){
+        localStorage.removeItem(KEY); data = []; renderAll();
+      }
+    };
+
+    // Search
+    searchEl.addEventListener('input', renderEntries);
+
+    // Render entries list
+    function renderEntries(){
+      const q = searchEl.value.trim().toLowerCase();
+      const items = (data||[]).filter(e => !q || (e.text||'').toLowerCase().includes(q));
+      entriesEl.innerHTML = items.length? '' : '<div class="muted">No entries yet.</div>';
+      items.slice().reverse().forEach(e => {
+        const mood = MOODS.find(m=>m.score===e.mood);
+        const div = document.createElement('div');
+        div.className = 'entry';
+        div.innerHTML = `
+          <div class="entry-top">
+            <div><span class="pill" style="border-color:${mood.color}">${mood.emoji} ${mood.name}</span> <span class="muted">• ${e.date}</span></div>
+            <div>
+              <button class="btn ghost" data-act="edit">Edit</button>
+              <button class="btn ghost" data-act="del">Delete</button>
+            </div>
+          </div>
+          <div style="margin-top:8px; white-space:pre-wrap">${(e.text||'')}</div>
+        `;
+        div.querySelector('[data-act="del"]').onclick = () => {
+          if(confirm('Delete entry for '+e.date+'?')){
+            data = data.filter(x=>x.date!==e.date); save(data); renderAll();
+          }
+        };
+        div.querySelector('[data-act="edit"]').onclick = () => {
+          selectedMood = e.mood; journalEl.value = e.text||''; quoteText.textContent='';
+          document.querySelectorAll('.moodbtn').forEach(b=>b.classList.remove('active'));
+          const idx = MOODS.findIndex(m=>m.score===e.mood);
+          if(idx>=0) moodPicker.children[idx].classList.add('active');
+          window.scrollTo({top:0, behavior:'smooth'});
+        };
+        entriesEl.appendChild(div);
+      });
+    }
+
+    // Chart
+    function renderChart(){
+      const ctx = document.getElementById('moodChart');
+      const labels = data.map(e => e.date);
+      const values = data.map(e => e.mood);
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type:'line',
+        data:{
+          labels,
+          datasets:[{
+            label:'Mood score (1–5)',
+            data: values,
+            tension:.35,
+            borderWidth:2,
+            pointRadius:4,
+          }]
+        },
+        options:{
+          scales:{ y:{ min:1, max:5, ticks:{ stepSize:1 } } },
+          plugins:{ legend:{ display:false } },
+          onClick: (evt, elems) => {
+            if(!elems.length) return;
+            const i = elems[0].index; // clicked point index
+            const d = data[i];
+            const el = Array.from(entriesEl.children).find(div => div.innerHTML.includes(d.date));
+            if(el) el.scrollIntoView({behavior:'smooth'});
+          }
+        }
+      });
+    }
+
+    function renderAll(){ data = load(); renderEntries(); renderChart(); }
+
+    // init
+    renderMoodButtons();
+    renderAll();
+  </script>
+</body>
+</html>
